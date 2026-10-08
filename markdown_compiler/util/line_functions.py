@@ -2,6 +2,29 @@
 Each of the functions in this file takes a single line of input and transforms the line in some way.
 '''
 
+
+def compile_delimiter(line, delimiter, tag):
+    result = ""
+    position = 0
+
+    while True:
+        start = line.find(delimiter, position)
+        if start == -1:
+            result += line[position:]
+            break
+
+        end = line.find(delimiter, start + len(delimiter))
+        if end == -1:
+            result += line[position:]
+            break
+
+        result += line[position:start]
+        content = line[start + len(delimiter):end]
+        result += "<" + tag + ">" + content + "</" + tag + ">"
+        position = end + len(delimiter)
+    return result
+
+
 def compile_headers(line):
     '''
     Convert markdown headers into <h1>,<h2>,etc tags.
@@ -26,6 +49,9 @@ def compile_headers(line):
     >>> compile_headers('      # this is not a header')
     '      # this is not a header'
     '''
+    for level in range(6, 0, -1):
+        if line[:level] == "#" * level:
+            return "<h" + str(level) + ">" + line[level:] + "</h" + str(level) + ">"
     return line
 
 
@@ -50,7 +76,7 @@ def compile_italic_star(line):
     >>> compile_italic_star('*')
     '*'
     '''
-    return line
+    return compile_delimiter(line, "*", "i")
 
 
 def compile_italic_underscore(line):
@@ -71,7 +97,7 @@ def compile_italic_underscore(line):
     >>> compile_italic_underscore('_')
     '_'
     '''
-    return line
+    return compile_delimiter(line, "_", "i")
 
 
 def compile_strikethrough(line):
@@ -94,7 +120,7 @@ def compile_strikethrough(line):
     >>> compile_strikethrough('~~')
     '~~'
     '''
-    return line
+    return compile_delimiter(line, "~~", "ins")
 
 
 def compile_bold_stars(line):
@@ -115,7 +141,7 @@ def compile_bold_stars(line):
     >>> compile_bold_stars('**')
     '**'
     '''
-    return line
+    return compile_delimiter(line, "**", "b")
 
 
 def compile_bold_underscore(line):
@@ -136,7 +162,7 @@ def compile_bold_underscore(line):
     >>> compile_bold_underscore('__')
     '__'
     '''
-    return line
+    return compile_delimiter(line, "__", "b")
 
 
 def compile_code_inline(line):
@@ -166,7 +192,31 @@ def compile_code_inline(line):
     >>> compile_code_inline('```python3')
     '```python3'
     '''
-    return line
+    if line.startswith("```"):
+        return line
+
+    result = ""
+    position = 0
+
+    while True:
+        start = line.find("`", position)
+        if start == -1:
+            result += line[position:]
+            break
+
+        end = line.find("`", start + 1)
+        if end == -1:
+            result += line[position:]
+            break
+
+        result += line[position:start]
+        content = line[start + 1:end]
+        content = content.replace("<", "&lt;")
+        content = content.replace(">", "&gt;")
+        result += "<code>" + content + "</code>"
+        position = end + 1
+
+    return result
 
 
 def compile_links(line):
@@ -186,7 +236,42 @@ def compile_links(line):
     >>> compile_links('this is wrong: [course webpage](https://github.com/mikeizbicki/cmc-csci040')
     'this is wrong: [course webpage](https://github.com/mikeizbicki/cmc-csci040'
     '''
-    return line
+    result = ""
+    position = 0
+
+    while True:
+        start = line.find("[", position)
+        if start == -1:
+            result += line[position:]
+            break
+
+        if start > 0 and line[start - 1] == "!":
+            result += line[position:start + 1]
+            position = start + 1
+            continue
+
+        middle = line.find("]", start + 1)
+        if middle == -1:
+            result += line[position:]
+            break
+
+        if line[middle:middle + 2] != "](":
+            result += line[position:middle + 1]
+            position = middle + 1
+            continue
+
+        end = line.find(")", middle + 2)
+        if end == -1:
+            result += line[position:]
+            break
+
+        text = line[start + 1:middle]
+        url = line[middle + 2:end]
+        result += line[position:start]
+        result += '<a href="' + url + '">' + text + "</a>"
+        position = end + 1
+
+    return result
 
 
 def compile_images(line):
@@ -205,4 +290,34 @@ def compile_images(line):
     >>> compile_images('This is an image of Mike Izbicki: ![Mike Izbicki](https://avatars1.githubusercontent.com/u/1052630?v=2&s=460)')
     'This is an image of Mike Izbicki: <img src="https://avatars1.githubusercontent.com/u/1052630?v=2&s=460" alt="Mike Izbicki" />'
     '''
-    return line
+    result = ""
+    position = 0
+
+    while True:
+        start = line.find("![", position)
+        if start == -1:
+            result += line[position:]
+            break
+
+        middle = line.find("]", start + 2)
+        if middle == -1:
+            result += line[position:]
+            break
+
+        if line[middle:middle + 2] != "](":
+            result += line[position:middle + 1]
+            position = middle + 1
+            continue
+
+        end = line.find(")", middle + 2)
+        if end == -1:
+            result += line[position:]
+            break
+
+        text = line[start + 2:middle]
+        url = line[middle + 2:end]
+        result += line[position:start]
+        result += '<img src="' + url + '" alt="' + text + '" />'
+        position = end + 1
+
+    return result
